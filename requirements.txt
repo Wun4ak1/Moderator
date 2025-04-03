@@ -1,0 +1,5 @@
+python-telegram-bot==22.0
+requests==2.32.3
+python-dotenv==1.0.0
+python-telegram-bot[job-queue]
+aiosqlite
