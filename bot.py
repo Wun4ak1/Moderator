@@ -1120,12 +1120,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == CREATOR_ID:
         return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
 
+    # Гуруҳ учун минимал чеклов
+    required_refs = get_refer_limit(chat_id)
+
     # Фойдаланувчининг таклифлар сони
     refer_count = get_refer_count(user_id, chat_id)
     print(f"🔹 REFER COUNT DEBUG: user_id={user_id}, refer_count={refer_count}, required_refs={required_refs}")
-
-    # Гуруҳ учун минимал чеклов
-    required_refs = get_refer_limit(chat_id)
 
     # ✅ Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
     if refer_count < required_refs:
