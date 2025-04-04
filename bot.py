@@ -972,6 +972,8 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
             """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
+            print(f"🔹 REFER COUNT: {refer_count}")  # Лог: Refer count
+
             required_refs = get_refer_limit(chat_id)  # ✅ Гуруҳ ID бўйича minimal referral olish
             write_access = 1 if refer_count >= required_refs else 0  # Ёзиш ҳуқуқи, агар минимал чекловга етилса 1 бўлади
 
@@ -1075,6 +1077,8 @@ def get_refer_count(user_id: int) -> int:
             cursor = conn.cursor()
             cursor.execute("SELECT refer_count FROM users WHERE user_id=?", (user_id,))
             result = cursor.fetchone()
+
+            print(f"🔹 get_refer_count: user_id={user_id} - refer_count={result}")  # LOG
 
             return int(result[0]) if result and result[0] is not None else 0  # ✅ NULL yoki None bo‘lsa, 0 qaytaradi
         
