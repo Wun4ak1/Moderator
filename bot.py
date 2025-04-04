@@ -1068,7 +1068,7 @@ def check_write_access(user_id, chat_id):
     return write_access == 1  # Агар ёзиш ҳуқуқи берилган бўлса, true қайтарамиз
 
 # ✅ Фойдаланувчининг таклифларини текшириш    
-def get_refer_count(user_id: int) -> int:
+def get_refer_count(user_id: int, chat_id: int):
     print(f"🔍 get_refer_count({user_id})")  # Лог қўшилган
     """
     Фойдаланувчининг таклиф қилган одамлар сонини қайтаради.
@@ -1076,17 +1076,21 @@ def get_refer_count(user_id: int) -> int:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT refer_count FROM users WHERE user_id=?", (user_id,))
-            result = cursor.fetchone()
+            cursor.execute("""
+                SELECT refer_count 
+                FROM users 
+                WHERE user_id=? 
+                    AND chat_id=?
+            """, (user_id, chat_id))
+            refer_count = cursor.fetchone()
+            if refer_count is None:
+                print(f"❌ {user_id} учун таклифлар сони мавжуд эмас.")
+                return 0  # Агар фойдаланувчи учун маълумот мавжуд бўлмаса, 0 қайтариш
+            return refer_count[0]
 
-            print(f"🔹 get_refer_count: user_id={user_id} - refer_count={result}")  # LOG
-
-            return int(result[0]) if result and result[0] is not None else 0  # ✅ NULL yoki None bo‘lsa, 0 qaytaradi
-        
     except sqlite3.Error as e:
-        print(f"❌ get_refer_count({user_id}): Xatolik yuz berdi: {e}")
-        return 0  # ❌ Xatolik bo‘lsa ham, bot ishdan chiqmasligi uchun 0 qaytaramiz
-
+        print(f"❌ get_refer_count({user_id}): Xатолик yuz berdi: {e}")
+        return 0
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ Фақатгина оддий хабарлар учун ишлайди
