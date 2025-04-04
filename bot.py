@@ -947,7 +947,7 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
             # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
             add_group_to_db(chat_id)
 
-            # 📌 Фойдаланувчи базада бор ёки йўқлигини текшириш
+           # 📌 Фойдаланувчи базада бор ёки йўқлигини текшириш
             cursor.execute("""
                     SELECT user_id 
                     FROM users 
@@ -961,21 +961,21 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
                     INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by) 
                     VALUES (?, ?, ?, ?, ?)
                 """, (user_id, chat_id, 0, 0, invited_by))
-                conn.commit()
+                conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
             cursor.execute("""
-                SELECT COUNT(*)  -- Фойдаланувчи таклиф қилганлар сони
-                FROM users  -- Фойдаланувчилар жадвали
-                WHERE invited_by=?  -- Таклиф қилган фойдаланувчи ID
-                    AND chat_id=?  -- Гуруҳ ID
+                SELECT COUNT(*) 
+                FROM users 
+                WHERE invited_by=? 
+                    AND chat_id=?
             """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
             print(f"🔹 REFER COUNT: {refer_count}")  # Лог: Refer count
 
-            required_refs = get_refer_limit(chat_id)  # ✅ Гуруҳ ID бўйича minimal referral olish
-            write_access = 1 if refer_count >= required_refs else 0  # Ёзиш ҳуқуқи, агар минимал чекловга етилса 1 бўлади
+            required_refs = get_refer_limit(chat_id)  # ✅ Гуруҳ ID бўйича minimal referral олиш
+            write_access = int(refer_count >= required_refs)  # ✅ 1 ёки 0
 
             # 📌 Таклиф қилган фойдаланувчининг маълумотларини янгилаш
             cursor.execute("""
@@ -984,9 +984,9 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
                 WHERE user_id=? 
                     AND chat_id=?
             """, (refer_count, write_access, invited_by, chat_id))
-            conn.commit()
+            conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
-            print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs}), ёзиш ҳуқуқи: {write_access}")
+            print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs})")
 
     except sqlite3.Error as e:
         print(f"❌ add_referral({user_id}): Xатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
