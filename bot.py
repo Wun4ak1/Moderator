@@ -1069,10 +1069,7 @@ def check_write_access(user_id, chat_id):
 
 # ✅ Фойдаланувчининг таклифларини текшириш    
 def get_refer_count(user_id: int, chat_id: int):
-    print(f"🔍 get_refer_count({user_id})")  # Лог қўшилган
-    """
-    Фойдаланувчининг таклиф қилган одамлар сонини қайтаради.
-    """
+    """Фойдаланувчи таклифлари сонини олиш."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1091,6 +1088,7 @@ def get_refer_count(user_id: int, chat_id: int):
     except sqlite3.Error as e:
         print(f"❌ get_refer_count({user_id}): Xатолик yuz berdi: {e}")
         return 0
+
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ Фақатгина оддий хабарлар учун ишлайди
@@ -1117,7 +1115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
 
     # Фойдаланувчининг таклифлар сони
-    refer_count = get_refer_count(user_id)
+    refer_count = get_refer_count(user_id, chat_id)
 
     # Гуруҳ учун минимал чеклов
     required_refs = get_refer_limit(chat_id)
