@@ -59,32 +59,7 @@ broadcast_waiting = {}  # 📌 CREATOR'нинг жавобини кутиш уч
 # 📂 Файл жойлашуви
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Жорий файл директорияси
 DB_PATH = os.path.join(BASE_DIR, "users.db")  # Локал базани шу ерга қўямиз
-# Baza bilan ulanish
-conn = sqlite3.connect('users.db')
-cursor = conn.cursor()
 
-# 'users' jadvalini o'chirish
-cursor.execute("DROP TABLE IF EXISTS users;")
-conn.commit()  # O'zgarishlarni bazaga saqlash
-
-# Yangi 'users' jadvalini yaratish
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER,  -- Foydalanuvchi ID
-        chat_id INTEGER,  -- Guruh ID
-        refer_count INTEGER DEFAULT 0,  -- Takliflar soni
-        write_access INTEGER DEFAULT 0,  -- Yozish huquqi
-        invited_by INTEGER,  -- Taklif qilgan foydalanuvchi ID
-        is_active INTEGER DEFAULT 1,  -- Guruhda qolgan yoki chiqib ketganligini saqlash
-        PRIMARY KEY (user_id, chat_id)  -- Foydalanuvchi + guruh bo‘yicha unikallik
-    )
-""")
-conn.commit()  # O'zgarishlarni bazaga saqlash
-
-print("✅ 'users' jadvali muvaffaqiyatli o'chirildi va qayta yaratildi!")
-
-# Ulashishni yopish
-conn.close()
 # 🛠 Базага уланиш функцияси
 def get_db_connection():
     return sqlite3.connect(DB_PATH) # Базани инициализация қиламиз /app/users.db
@@ -95,25 +70,22 @@ def create_users_table():
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # 🚀 Эски жадвални ўчириш (агар мавжуд бўлса)
-            cursor.execute("DROP TABLE IF EXISTS users")
-
-            # 🛠 Янги users жадвалини яратиш
+           # Янгиланган код: Жадвал мавжуд бўлса, ўчирмасдан фақат яратиш
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER,  -- Фойдаланувчи ID
-                chat_id INTEGER,  -- ✅ Guruh ID
-                refer_count INTEGER DEFAULT 0,  -- Таклифлар сони
-                write_access INTEGER DEFAULT 0,  -- Ёзиш ҳуқуқи
-                invited_by INTEGER,  -- Таклиф қилган фойдаланувчи ID
-                is_active INTEGER DEFAULT 1,  -- ✅ Гуруҳда қолган ёки чиқиб кетганлигини сақлаш
-                PRIMARY KEY (user_id, chat_id)  -- ✅ Foydalanuvчи + guruh bo‘yicha уникаллик
-            )
-        """)
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER,  -- Фойдаланувчи ID
+                    chat_id INTEGER,  -- Guruh ID
+                    refer_count INTEGER DEFAULT 0,  -- Takliflar soni
+                    write_access INTEGER DEFAULT 0,  -- Yozish huquqi
+                    invited_by INTEGER,  -- Taklif qilgan foydalanuvchi ID
+                    is_active INTEGER DEFAULT 1,  -- Guruhda qolgan yoki chiqib ketganligini saqlash
+                    PRIMARY KEY (user_id, chat_id)  -- Foydalanuvchi + guruh bo‘yicha unikallik
+                )
+            """)
             conn.commit()
-        print("✅ 'users' жадвали муваффақиятли қайта яратилди!")
+        print("✅ 'users' жадвали муваффақиятли яратилди!")
     except sqlite3.Error as e:
-        print(f"❌ 'users' жадвалини қайта яратишда хатолик: {e}")
+        print(f"❌ 'users' жадвалини яратишда хатолик: {e}")
 
 # 🛠 "settings" жадвалини яратиш
 def create_settings_table():
@@ -136,10 +108,10 @@ def create_settings_table():
         print(f"❌ settings жадвалини яратишда хатолик: {e}")
 
 # 🔄 Барча жадвалларни яратиш
-#def init_db():
-#    create_users_table()
-#    create_settings_table()
-#    add_groups_if_not_exists()
+def init_db():
+    create_users_table()
+    create_settings_table()
+    add_groups_if_not_exists()
 
 # Ботни ишга тушириш буйруғи
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -670,11 +642,19 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """, (user_id, chat_id))
     refer_count = cursor.fetchone()[0] or 0  # None бўлса 0
 
-#    print(f"User ID: {user_id}, Group ID: {chat_id}, Referral Count: {refer_count}")
+    # ✅ Ёзиш ҳуқуқи берилган фойдаланувчиларни ҳисоблаш
+    cursor.execute("""
+        SELECT COUNT(*) 
+        FROM users 
+        WHERE invited_by=? AND chat_id=? AND is_active=1 AND write_access=1
+    """, (user_id, chat_id))
+    can_write_count = cursor.fetchone()[0] or 0  # None бўлса 0
 
     conn.close()
 
-    mssg = await update.message.reply_text(f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊", parse_mode="HTML")
+    mssg = await update.message.reply_text(f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
+                                          f"📄 Ёзиш ҳуқуқи берилганлар сони: <b>{can_write_count} та!</b>", 
+                                          parse_mode="HTML")
 
     await asyncio.sleep(5)
 
@@ -1267,10 +1247,7 @@ async def command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Ботни ишга тушириш
 def main():
-    # init_db()  # ✅ SQL жадвалини яратиш **ФАҚАТ БИР МАРТА**
-    create_users_table()       # ⚠️ ШУ ҚАТОР МУҲИМ
-    create_settings_table()
-    check_user_data()
+    init_db()  # ✅ SQL жадвалини яратиш **ФАҚАТ БИР МАРТА**
 
     # 📌 Ботни инициализация қилиш
     app = Application.builder().token(TOKEN).build()
