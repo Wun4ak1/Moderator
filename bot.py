@@ -55,7 +55,32 @@ broadcast_waiting = {}  # 📌 CREATOR'нинг жавобини кутиш уч
 # 📂 Файл жойлашуви
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Жорий файл директорияси
 DB_PATH = os.path.join(BASE_DIR, "users.db")  # Локал базани шу ерга қўямиз
+# Baza bilan ulanish
+conn = sqlite3.connect('users.db')
+cursor = conn.cursor()
 
+# 'users' jadvalini o'chirish
+cursor.execute("DROP TABLE IF EXISTS users;")
+conn.commit()  # O'zgarishlarni bazaga saqlash
+
+# Yangi 'users' jadvalini yaratish
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER,  -- Foydalanuvchi ID
+        chat_id INTEGER,  -- Guruh ID
+        refer_count INTEGER DEFAULT 0,  -- Takliflar soni
+        write_access INTEGER DEFAULT 0,  -- Yozish huquqi
+        invited_by INTEGER,  -- Taklif qilgan foydalanuvchi ID
+        is_active INTEGER DEFAULT 1,  -- Guruhda qolgan yoki chiqib ketganligini saqlash
+        PRIMARY KEY (user_id, chat_id)  -- Foydalanuvchi + guruh bo‘yicha unikallik
+    )
+""")
+conn.commit()  # O'zgarishlarni bazaga saqlash
+
+print("✅ 'users' jadvali muvaffaqiyatli o'chirildi va qayta yaratildi!")
+
+# Ulashishni yopish
+conn.close()
 # 🛠 Базага уланиш функцияси
 def get_db_connection():
     return sqlite3.connect(DB_PATH) # Базани инициализация қиламиз /app/users.db
@@ -71,16 +96,16 @@ def create_users_table():
 
             # 🛠 Янги users жадвалини яратиш
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER,  -- Фойдаланувчи ID
-                    chat_id INTEGER,  -- ✅ Guruh ID
-                    refer_count INTEGER DEFAULT 0,  -- Таклифлар сони
-                    write_access INTEGER DEFAULT 0,  -- Ёзиш ҳуқуқи
-                    invited_by INTEGER,  -- Таклиф қилган фойдаланувчи ID
-                    is_active INTEGER DEFAULT 1,  -- ✅ Гуруҳда қолган ёки чиқиб кетганлигини сақлаш
-                    PRIMARY KEY (user_id, chat_id)  -- ✅ Foydalanuvchi + guruh bo‘yicha unikallik
-                )
-            """)
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER,  -- Фойдаланувчи ID
+                chat_id INTEGER,  -- ✅ Guruh ID
+                refer_count INTEGER DEFAULT 0,  -- Таклифлар сони
+                write_access INTEGER DEFAULT 0,  -- Ёзиш ҳуқуқи
+                invited_by INTEGER,  -- Таклиф қилган фойдаланувчи ID
+                is_active INTEGER DEFAULT 1,  -- ✅ Гуруҳда қолган ёки чиқиб кетганлигини сақлаш
+                PRIMARY KEY (user_id, chat_id)  -- ✅ Foydalanuvчи + guruh bo‘yicha уникаллик
+            )
+        """)
             conn.commit()
         print("✅ 'users' жадвали муваффақиятли қайта яратилди!")
     except sqlite3.Error as e:
@@ -107,10 +132,10 @@ def create_settings_table():
         print(f"❌ settings жадвалини яратишда хатолик: {e}")
 
 # 🔄 Барча жадвалларни яратиш
-def init_db():
-    create_users_table()
-    create_settings_table()
-    add_groups_if_not_exists()
+#def init_db():
+#    create_users_table()
+#    create_settings_table()
+#    add_groups_if_not_exists()
 
 # Ботни ишга тушириш буйруғи
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1238,8 +1263,11 @@ async def command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Ботни ишга тушириш
 def main():
-    init_db()  # ✅ SQL жадвалини яратиш **ФАҚАТ БИР МАРТА**
-    
+    # init_db()  # ✅ SQL жадвалини яратиш **ФАҚАТ БИР МАРТА**
+    create_users_table()       # ⚠️ ШУ ҚАТОР МУҲИМ
+    create_settings_table()
+    check_user_data()
+
     # 📌 Ботни инициализация қилиш
     app = Application.builder().token(TOKEN).build()
 
