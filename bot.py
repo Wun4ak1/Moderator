@@ -936,8 +936,8 @@ def get_refer_limit(chat_id: int) -> int:
         return MIN_REFER
 
 # Базага одамни қўшиш ёки янгилаш
-def add_referral(user_id: int, invited_by: int, chat_id: int):
-    """Фойдаланувчининг referral ҳисобини ошириш ва ёзиш ҳуқуқини белгиллаш."""
+def add_referral(user_id, chat_id, invited_by):
+    """Янги таклифни базага қўшиш."""
     print(f"🔍 add_referral() ishladi: user_id={user_id}, chat_id={chat_id}, invited_by={invited_by}")  # ✅ LOG
 
     try:
@@ -946,6 +946,8 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
 
             # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
             add_group_to_db(chat_id)
+
+            
 
            # 📌 Фойдаланувчи базада бор ёки йўқлигини текшириш
             cursor.execute("""
@@ -969,6 +971,7 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
                 FROM users 
                 WHERE invited_by=? 
                     AND chat_id=?
+                    AND write_access=1
             """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
@@ -1082,12 +1085,12 @@ def get_refer_count(user_id: int, chat_id: int):
             refer_count = cursor.fetchone()
             if refer_count is None:
                 print(f"❌ {user_id} учун таклифлар сони мавжуд эмас.")
-                return 0  # Агар фойдаланувчи учун маълумот мавжуд бўлмаса, 0 қайтариш
+                return 0  # Агар маълумот бўлмаса, 0 қайтариш
             return refer_count[0]
 
     except sqlite3.Error as e:
-        print(f"❌ get_refer_count({user_id}): Xатолик yuz berdi: {e}")
-        return 0
+        print(f"❌ get_refer_count({user_id}): Хатолик yuz berdi: {e}")
+        return 0  # Хатолик бўлса ҳам 0 қайтариш
 
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
