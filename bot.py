@@ -82,6 +82,10 @@ def create_users_table():
                     PRIMARY KEY (user_id, chat_id)  -- Foydalanuvchi + guruh bo‘yicha unikallik
                 )
             """)
+            
+            # Индексларни қўшиш
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_id_chat_id ON users(user_id, chat_id)")
+            
             conn.commit()
         print("✅ 'users' жадвали муваффақиятли яратилди!")
     except sqlite3.Error as e:
@@ -102,6 +106,10 @@ def create_settings_table():
                     min_refer INTEGER DEFAULT 5  -- Минимал таклифлар сони
                 )
             """)
+
+            # Индексларни қўшиш
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_id ON settings(chat_id)")
+            
             conn.commit()
             print("✅ 'settings' жадвали муваффақиятли яратилди!")
     except sqlite3.Error as e:
@@ -947,18 +955,16 @@ def add_referral(user_id, chat_id, invited_by):
             # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
             add_group_to_db(chat_id)
 
-            
-
-           # 📌 Фойдаланувчи базада бор ёки йўқлигини текшириш
+            # 📌 Фойдаланувчи базада бор ёки йўқлигини текшириш
             cursor.execute("""
                     SELECT user_id 
                     FROM users 
                     WHERE user_id=? 
                         AND chat_id=?
-                """,  (user_id, chat_id))
+                """, (user_id, chat_id))
             exists = cursor.fetchone()
 
-            if not exists: # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
+            if not exists:  # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
                 cursor.execute("""
                     INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by) 
                     VALUES (?, ?, ?, ?, ?)
@@ -970,8 +976,8 @@ def add_referral(user_id, chat_id, invited_by):
                 SELECT COUNT(*) 
                 FROM users 
                 WHERE invited_by=? 
-                    AND chat_id=?
-                    AND write_access=1
+                    AND chat_id=? 
+                    AND write_access=1  # Ўзгартирилган ҳолат: фақат ёзиш ҳуқуқи борлар
             """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
@@ -992,7 +998,7 @@ def add_referral(user_id, chat_id, invited_by):
             print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs})")
 
     except sqlite3.Error as e:
-        print(f"❌ add_referral({user_id}): Xатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
+        print(f"❌ add_referral({user_id}): Хатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
 
 # Гуруҳга янги одам қўшилганда
 async def new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):  
@@ -1071,21 +1077,22 @@ def check_write_access(user_id, chat_id):
     return write_access == 1  # Агар ёзиш ҳуқуқи берилган бўлса, true қайтарамиз
 
 # ✅ Фойдаланувчининг таклифларини текшириш    
-def get_refer_count(user_id: int, chat_id: int):
+def get_refer_count(user_id, chat_id):
     """Фойдаланувчи таклифлари сонини олиш."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT refer_count 
-                FROM users 
-                WHERE user_id=? 
-                    AND chat_id=?
+                SELECT refer_count
+                FROM users
+                WHERE user_id=? AND chat_id=?
             """, (user_id, chat_id))
             refer_count = cursor.fetchone()
+            
             if refer_count is None:
                 print(f"❌ {user_id} учун таклифлар сони мавжуд эмас.")
                 return 0  # Агар маълумот бўлмаса, 0 қайтариш
+            
             return refer_count[0]
 
     except sqlite3.Error as e:
