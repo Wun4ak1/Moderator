@@ -648,20 +648,29 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         FROM users 
         WHERE invited_by=? AND chat_id=? AND is_active=1 AND write_access=1
     """, (user_id, chat_id))
-    can_write_count = cursor.fetchone()[0] or 0  # None бўлса 0
+    write_access = cursor.fetchone()[0] or 0  # None бўлса 0
 
     conn.close()
 
-    mssg = await update.message.reply_text(
-        f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
-        f"{'❌ Сизга ёзиш ҳуқуқи берилмаган!\n' if can_write_count == 0 else '✅ Сизга ёзиш ҳуқуқи берилган!\n'}", 
-        parse_mode="HTML"
-    )
+    if write_access == 0:
+        access_message = "❌ Сизга ёзиш ҳуқуқи берилмаган!"
+    else:
+        access_message = "✅ Сизга ёзиш ҳуқуқи берилган!"
 
-    await asyncio.sleep(5)
+    mssg = await update.message.reply_text(f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n{access_message}", parse_mode="HTML")
 
+#    mssg = await update.message.reply_text(
+#        f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
+#        f"{'❌ Сизга ёзиш ҳуқуқи берилмаган!\n' if write_access == 0 else '✅ Сизга ёзиш ҳуқуқи берилган!\n'}", 
+#        parse_mode="HTML"
+#    )
     try:
         await message.delete()
+    except Exception:
+        pass
+
+    await asyncio.sleep(5)
+    try:
         await mssg.delete()
     except Exception:
         pass
@@ -929,9 +938,7 @@ def get_refer_limit(chat_id: int) -> int:
 # Базага одамни қўшиш ёки янгилаш
 def add_referral(user_id: int, invited_by: int, chat_id: int):
     """Фойдаланувчининг referral ҳисобини ошириш ва ёзиш ҳуқуқини белгиллаш."""
-    """Фойдаланувчини базада қўшиш ёки янгилаш, таклиф қилганларни ҳисоблаш."""
-    print(f"🔍 add_referral() ishladi: user_id={user_id}, chat_id={chat_id}")  # ✅ LOG
-    print(f"🔍 add_referral() ishladi: invited_by={invited_by}")  # ✅ LOG
+    print(f"🔍 add_referral() ishladi: user_id={user_id}, chat_id={chat_id}, invited_by={invited_by}")  # ✅ LOG
 
     try:
         with get_db_connection() as conn:
@@ -958,15 +965,15 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
             cursor.execute("""
-                SELECT COUNT(*) 
-                FROM users 
-                WHERE invited_by=? 
-                    AND chat_id=?
+                SELECT COUNT(*)  -- Фойдаланувчи таклиф қилганлар сони
+                FROM users  -- Фойдаланувчилар жадвали
+                WHERE invited_by=?  -- Таклиф қилган фойдаланувчи ID
+                    AND chat_id=?  -- Гуруҳ ID
             """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
             required_refs = get_refer_limit(chat_id)  # ✅ Гуруҳ ID бўйича minimal referral olish
-            write_access = int(refer_count >= required_refs)  # ✅ 1 ёки 0
+            write_access = 1 if refer_count >= required_refs else 0  # Ёзиш ҳуқуқи, агар минимал чекловга етилса 1 бўлади
 
             # 📌 Таклиф қилган фойдаланувчининг маълумотларини янгилаш
             cursor.execute("""
@@ -977,7 +984,7 @@ def add_referral(user_id: int, invited_by: int, chat_id: int):
             """, (refer_count, write_access, invited_by, chat_id))
             conn.commit()
 
-            print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs})")
+            print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs}), ёзиш ҳуқуқи: {write_access}")
 
     except sqlite3.Error as e:
         print(f"❌ add_referral({user_id}): Xатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
@@ -991,7 +998,6 @@ async def new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_user = update.message.new_chat_members[0]  # ✅ Янги қўшилган фойдаланувчи
         new_user_id = new_user.id  # 📌 Фойдаланувчи ID
         chat_id = update.message.chat_id  # 📌 Гуруҳ ID
-
         inviter_id = update.message.from_user.id  # ✅ Таклиф қилган шахснинг ID
 
         print(f"👤 Янги аъзо ID: {new_user_id}, Таклиф қилган ID: {inviter_id}, Гуруҳ ID: {chat_id}")
