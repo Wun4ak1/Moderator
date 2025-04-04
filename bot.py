@@ -50,6 +50,10 @@ load_dotenv()
 TOKEN = os.getenv("TOKEN")
 CREATOR_ID = int(os.getenv("CREATOR_ID"))  # Ботнинг яратувчиси ID'си
 # print(f"CREATOR_ID = {CREATOR_ID} (Type: {type(CREATOR_ID)})") # CREATOR_ID = 200555555 (Type: <class 'int'>)
+
+if not TOKEN:
+    print("Xato: .env faylida TOKEN sozlanmagan.")
+
 broadcast_waiting = {}  # 📌 CREATOR'нинг жавобини кутиш учун
 
 # 📂 Файл жойлашуви
