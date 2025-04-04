@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import importlib
 import sqlite3
+import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, JobQueue, ChatMemberHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -253,9 +254,14 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ CREATOR'га натижани юбориш
     await update.message.reply_text(f"✅ Хабар {sent_count} та гуруҳга юборилди!", parse_mode="HTML")
 
+MIN_REFER = 5  # Стандарт минимал реферал лимити
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # 🔹 Гуруҳ базага қўшилиши учун
 def add_group_to_db(chat_id: int):
-    """Гуруҳни settings жадвалига қўшади, агар у йўқ бўлса."""
+    """Гуруҳни settings жадвалига қўшиш, агар у йўқ бўлса."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -268,12 +274,9 @@ def add_group_to_db(chat_id: int):
                 cursor.execute("""
                     INSERT INTO settings (chat_id, min_refer) 
                     VALUES (?, ?)
-                """, (chat_id, 1))  # Default referral limit = 1
+                """, (chat_id, MIN_REFER))  # Default referral limit = MIN_REFER
                 conn.commit()
-                # print(f"✅ Гуруҳ базага қўшилди: {chat_id}")
-            # else:
-                # print(f"🔹 Гуруҳ олдиндан мавжуд: {chat_id}")
-
+                print(f"✅ Гуруҳ базага қўшилди: {chat_id}")
     except sqlite3.Error as e:
         print(f"❌ add_group_to_db(): Хатолик: {e}")
 
@@ -324,7 +327,7 @@ def add_groups_if_not_exists():
                 chat_id = chat_id_tuple[0]
 
                 # Гуруҳ `users` базасида бор-йўқлигини текшириш
-                cursor.execute("SELECT 1 FROM users WHERE chat_id=?", (chat_id,))
+                cursor.execute("SELECT chat_id FROM users WHERE chat_id=?", (chat_id,))
                 exists = cursor.fetchone()
 
                 if not exists:
@@ -339,8 +342,6 @@ def add_groups_if_not_exists():
                     # print(f"⚡ Гуруҳ `users` базасида аллақачон мавжуд: {chat_id}")
     except sqlite3.Error as e:
         print(f"❌ add_groups_if_not_exists(): Хатолик юз берди: {e}")
-
-import sqlite3
 
 def check_user_data():
     conn = sqlite3.connect(DB_PATH)
@@ -704,8 +705,6 @@ async def delete_set_limit(context: ContextTypes.DEFAULT_TYPE):  # JobQueue'да
     except Exception as e: # Агар хатолик бўлса,
         print(f"❌ Лимитни ўзгартириш тугмасини ўчиришда хатолик: {e}")
 
-MIN_REFER = 5  # Стандарт минимал реферал лимити
-
 # Лимитни ўзгартириш тугмасини юбориш
 async def set_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -966,9 +965,9 @@ def add_referral(user_id, chat_id, invited_by):
 
             if not exists:  # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
                 cursor.execute("""
-                    INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by) 
+                    INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
                     VALUES (?, ?, ?, ?, ?)
-                """, (user_id, chat_id, 0, 0, invited_by))
+                """, (user_id, chat_id, 0, 1, invited_by, 1))
                 conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
@@ -1006,17 +1005,21 @@ async def new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #print(f"🔹 new_member чақирилди: {update}") # ТЕГИШЛИ ХАБАРЛАРНИ ЛОГГА ЧИҚАРАМИЗ
 
     if update.message and update.message.new_chat_members:
-        new_user = update.message.new_chat_members[0]  # ✅ Янги қўшилган фойдаланувчи
-        new_user_id = new_user.id  # 📌 Фойдаланувчи ID
-        chat_id = update.message.chat_id  # 📌 Гуруҳ ID
-        inviter_id = update.message.from_user.id  # ✅ Таклиф қилган шахснинг ID
+        new_user = update.message.new_chat_members[0]  # Янги аъзо
+        new_user_id = new_user.id  # Фойдаланувчи ID
+        chat_id = update.message.chat_id  # Гуруҳ ID
+        inviter_id = update.message.from_user.id if update.message.from_user else None  # Таклиф қилган шахснинг ID (бот ёки фойдаланувчи)
 
         print(f"👤 Янги аъзо ID: {new_user_id}, Таклиф қилган ID: {inviter_id}, Гуруҳ ID: {chat_id}")
 
-        # ✅ add_referral() функциясини тўғри чақириш
-        add_referral(user_id=new_user_id, invited_by=inviter_id, chat_id=chat_id)
+        # Агар таклиф қилган шахс маълум бўлса, фойдаланувчи базасидаги `invited_by` фойдаланувчига қўшилади
+        if inviter_id:
+            add_referral(user_id=new_user_id, invited_by=inviter_id, chat_id=chat_id)
+        else:
+            add_referral(user_id=new_user_id, invited_by=None, chat_id=chat_id)
 
-        await delete_join_message(update, context)  # ✅ Хабарни ўчириш
+        # Хабарни ўчириш
+        await delete_join_message(update, context)
 
 # Гуруҳга қўшилиш ва чиқиш хабарларини ўчириш
 async def delete_join_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1114,12 +1117,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
-    # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
+    # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса (ҳар қандай ҳолатда гуруҳ базага қўшилади)
     add_group_to_db(chat_id)
     print(f"❌ def handle_message: {user_id} | Chat ID: {chat_id}")  # DEBUG
 
+    # Гуруҳ фойдаланувчисини базага қўшиш
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Фойдаланувчини базага қўшамиз, агар у йўқ бўлса
+            cursor.execute("SELECT user_id, chat_id FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
+            exists = cursor.fetchone()
+
+            if not exists:  # Агар фойдаланувчи базада йўқ бўлса, қўшамиз
+                cursor.execute("""
+                    INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (user_id, chat_id, 0, 1, None, 1))  # Янги фойдаланувчини қўшиш
+                conn.commit()
+                print(f"✅ Фойдаланувчи {user_id} гуруҳга қўшилди ва базага сақланди.")
+            else:
+                print(f"⚡ Фойдаланувчи {user_id} аллақачон базага қўшилган.")
+                
+    except sqlite3.Error as e:
+        print(f"❌ handle_message: Хатолик фойдаланувчи қўшишда: {e}")
+
+    # Админ ёки ижодкор бўлса, хабарни ёзишга рухсат берилмасин
     if chat_member.status in ["administrator", "creator"]:
-        return # Агар админ бўлса, функцияни тугатамиз
+        return 
 
     if user_id == CREATOR_ID:
         return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
@@ -1130,7 +1156,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Гуруҳ учун минимал чеклов
     required_refs = get_refer_limit(chat_id)
 
-    # ✅ Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
     if refer_count < required_refs:
         remaining = required_refs - refer_count  
 
