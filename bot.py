@@ -129,6 +129,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 print("Бот ишга тушмоқда...")
 
+# Шахсий хабарни қабул қилиш хендлери
+def handle_private_message(update, context):
+    # Шахсий хабар юборилганда, админга хабар ёзиб юбориш
+    user_id = update.message.from_user.id
+    user_name = update.message.from_user.first_name
+    message_text = update.message.text
+
+    # Фойдаланувчи номига босилганда шахсий чат очилади
+    user_mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'
+
+    # Админга хабар юбориш
+    context.bot.send_message(chat_id=CREATOR_ID, 
+                             text=f"Шахсий хабар юборилди!\n"
+                                  f"Фойдаланувчи: {user_mention} ({user_id})\n"
+                                  f"Хабар: {message_text}")
+
+    # Фойдаланувчига автоматик жавоб бериш
+    update.message.reply_text("Сизнинг хабарингиз администраторга юборилди. Жавоб келганида, унга хабар берилади.")
+
+def handle_admin_response(update: Update, context):
+    """Админдан жавобни қабул қилиб, фойдаланувчига юбориш."""
+    admin_message = update.message.text  # Админнинг жавоби
+    user_id = context.user_data.get('user_id')  # Жавобланган фойдаланувчининг ID'сини олиш
+
+    if user_id:
+        # Фойдаланувчига жавоб юбориш
+        context.bot.send_message(chat_id=user_id, text=f"Админдан жавоб: {admin_message}")
+
+        # Админга ёзиладиган хабар
+        update.message.reply_text("Сизнинг жавобингиз фойдаланувчига юборилди.")
+    else:
+        update.message.reply_text("Ҳеч қандай жавоб йўқ.")
+
+def forward_message(update: Update, context):
+    """Фойдаланувчининг хабарини админга юбориш."""
+    user_id = update.message.from_user.id
+    user_name = update.message.from_user.first_name
+    user_message = update.message.text
+
+    # Админга хабар юбориш
+    context.bot.send_message(CREATOR_ID, text=f"Фойдаланувчи: {user_name} ({user_id})\nХабар: {user_message}")
+    
+    # Ҳар бир фойдаланувчининг ID'сини сақлаш
+    context.user_data['user_id'] = user_id
+
 async def get_chat_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     await update.message.reply_text(f"👥 Гуруҳ ID: `{chat.id}`\n📛 Гуруҳ номи: {chat.title}", parse_mode="Markdown")
@@ -154,7 +199,8 @@ async def start_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     broadcast_waiting[user_id] = True  # ✅ CREATOR'нинг жавобини кутиш
     await update.message.reply_text("✍️ Хабарни киритинг!\n\n📌 Намуна:\n<b>Title:</b> Янги эълон!\nsubtitle: Бугунги йиғилиш ҳақида\n<i>description:</i> Йиғилиш 18:00 да бўлади.", parse_mode="HTML")
 
-async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Броадкаст хабарни қабул қилиш хендлери
+async def handle_broadcast_message(update, context):
     """📢 CREATOR хабар юборганда, барча гуруҳларга юбориш."""
     
     user_id = update.message.from_user.id
@@ -674,7 +720,7 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         access_message = "✅ Сизга ёзиш ҳуқуқи берилган!"
 
-    mssg = await update.message.reply_text(f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n{access_message}", parse_mode="HTML")
+    mssg = await update.message.reply_text(f"👤 <b>{first_name}</b>, \nСиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n{access_message}", parse_mode="HTML")
 
 #    mssg = await update.message.reply_text(
 #        f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
@@ -1150,6 +1196,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is not None:
         await anti_flood(update, context)  # Анти-флуд тизими
 
+    if user_id == CREATOR_ID:
+        return  # Ботнинг ижодкорини текширмаслик
+        
     if update.message.from_user.id == context.bot.id:  # Ботнинг ўз хабарини текшириш
         return  
 
@@ -1159,88 +1208,109 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
-    # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
-    add_group_to_db(chat_id)
+    # Каналда аъзо бўлиш шарт
+    # channel_id = "@your_channel_username"  # Бу ерда каналнинг юзерномесини ёзинг
 
     # ✅ Фойдаланувчини базага қўшиш
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        #channel_member = await context.bot.get_chat_member(channel_id, user_id)
+        #if channel_member.status == "member" or channel_member.status == "administrator" or channel_member.status == "creator":
+            #print(f"✅ Фойдаланувчи {user_name} каналга аъзо.")
 
-            # Фойдаланувчини базага қўшамиз, агар у йўқ бўлса
-            cursor.execute("SELECT user_id, chat_id FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
-            exists = cursor.fetchone()
+            # ✅ Фойдаланувчини базага қўшиш
+            #with get_db_connection() as conn
 
-            if not exists:  # Агар фойдаланувчи базада йўқ бўлса, қўшамиз
-                cursor.execute("""
-                    INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (user_id, chat_id, 0, 1, None, 1))  # Янги фойдаланувчини қўшиш
-                conn.commit()
-                print(f"✅ Фойдаланувчи {user_id} гуруҳга қўшилди ва базага сақланди.")
+        # Шахсий чатда фойдаланувчини базага қўшиш
+        if update.message.chat.type == "private":
+            # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
+            add_group_to_db(chat_id)
 
-                # Базага қўшилганидан кейин фойдаланувчига автоматик ёзиш ҳуқуқи берилган
-                # log_action("1-хабарни ёзди", user_id, chat_id)  # Хабар ёзилганини логлаштириш
-                print(f"✅ {user_name} 1-хуқуқидан фойдаланди.")
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+
+                # Фойдаланувчини базага қўшамиз, агар у йўқ бўлса
+                cursor.execute("SELECT user_id, chat_id FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
+                exists = cursor.fetchone()
+
+                if not exists:  # Агар фойдаланувчи базада йўқ бўлса, қўшамиз
+                    cursor.execute("""
+                        INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (user_id, chat_id, 0, 1, None, 1))  # Янги фойдаланувчини қўшиш
+                    conn.commit()
+                    print(f"✅ Фойдаланувчи {user_id} гуруҳга қўшилди ва базага сақланди.")
+
+                else:
+                    print(f"⚡ Фойдаланувчи {user_id} аллақачон базага қўшилган.")
                 return  # Фойдаланувчи базага қўшилганидан кейин у ёзишга рухсат олади
 
-            else:
-                print(f"⚡ Фойдаланувчи {user_id} аллақачон базага қўшилган.")
+        # Гуруҳда хабар келганида, чекловларни текшириш
+        if update.message.chat.type in ["group", "supergroup"]:
+            add_group_to_db(chat_id)
 
-                
-                # Агар фойдаланувчи админ бўлса, функцияни тугатамиз
-                if chat_member.status in ["administrator", "creator"]:
-                    return
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-                if user_id == CREATOR_ID:
-                    return  # Ботнинг ижодкорини текширмаслик
+                # Фойдаланувчини базага қўшиш, агар у йўқ бўлса
+                cursor.execute("SELECT user_id, chat_id FROM users WHERE user_id=? AND chat_id=?", (user_id, chat_id))
+                exists = cursor.fetchone()
 
-                # Фойдаланувчининг таклифлар сонини SQL орқали олиш
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM users 
-                    WHERE invited_by=? AND chat_id=? AND is_active=1
-                """, (user_id, chat_id))
-                refer_count = cursor.fetchone()[0] or 0  # None бўлса 0
-
-                # Фойдаланувчининг таклифлар сони
-                # refer_count = get_refer_count(user_id, chat_id) or 0
-
-                # Гуруҳ учун минимал чеклов
-                required_refs = get_refer_limit(chat_id)
-
-                # Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
-                if refer_count < required_refs:
-                    remaining = required_refs - refer_count
-                    print(f"🔴 Хабар ёзишга рухсат берилмади: user_id={user_id}, chat_id={chat_id}")
-
-                    mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'  
-
-                    try:
-                        await update.message.delete()  # Хабарни ўчириш
-                        warning_msg = await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=f"Ҳурматли {mention},\n"
-                                f"Гуруҳда хабар ёзиш учун \n"
-                                f"таклифлар сони {refer_count}, лимит {required_refs}!\n"
-                                f"яна {remaining} та одам қўшинг.",  
-                            parse_mode=ParseMode.HTML  
-                        )
-                        await asyncio.sleep(5) 
-                        await warning_msg.delete()  # Хабарни ўчириш
-                        return
-                    except Exception as e:
-                        print(f"❌ Хабарни ўчиришда хатолик: {e}")
-                else:
-                    # Агар минимал реферал лимитига етиб борган бўлса
-                    print(f"✅ Фойдаланувчи {user_id} хабар ёзишга рухсат олди.")
-                    
-                    # Фойдаланувчининг ёзиш ҳуқуқини базага қайта ёзиш
+                if not exists:  # Агар фойдаланувчи базада йўқ бўлса, қўшамиз
                     cursor.execute("""
-                        UPDATE users SET write_access = 1 WHERE user_id = ? AND chat_id = ?
-                    """, (user_id, chat_id))
+                        INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (user_id, chat_id, 0, 1, None, 1))  # Янги фойдаланувчини қўшиш
                     conn.commit()
-                    print(f"✅ Фойдаланувчи {user_id} ёзиш ҳуқуқига эга.")
+                    print(f"✅ Фойдаланувчи {user_id} гуруҳга қўшилди ва базага сақланди.")
+                    return
+                else:
+                    # Агар фойдаланувчи админ бўлса, функцияни тугатамиз
+                    if chat_member.status in ["administrator", "creator"]:
+                        return
+
+                    # Фойдаланувчининг таклифлар сонини SQL орқали олиш
+                    cursor.execute("""
+                        SELECT COUNT(*) 
+                        FROM users 
+                        WHERE invited_by=? AND chat_id=? AND is_active=1
+                    """, (user_id, chat_id))
+                    refer_count = cursor.fetchone()[0] or 0  # None бўлса 0
+
+                    # Гуруҳ учун минимал чеклов
+                    required_refs = get_refer_limit(chat_id)
+
+                    # Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
+                    if refer_count < required_refs:
+                        remaining = required_refs - refer_count
+                        print(f"🔴 Хабар ёзишга рухсат берилмади: user_id={user_id}, chat_id={chat_id}")
+
+                        mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'
+
+                        try:
+                            await update.message.delete()  # Хабарни ўчириш
+                            warning_msg = await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=f"Ҳурматли {mention},\n"
+                                    f"Гуруҳда хабар ёзиш учун \n"
+                                    f"таклифлар сони {refer_count}, лимит {required_refs}!\n"
+                                    f"яна {remaining} та одам қўшинг.",  
+                                parse_mode=ParseMode.HTML  
+                            )
+                            await asyncio.sleep(5) 
+                            await warning_msg.delete()  # Хабарни ўчириш
+                            return
+                        except Exception as e:
+                            print(f"❌ Хабарни ўчиришда хатолик: {e}")
+                    else:
+                        # Агар минимал реферал лимитига етиб борган бўлса
+                        print(f"✅ Фойдаланувчи {user_id} хабар ёзишга рухсат олди.")
+
+                        # Фойдаланувчининг ёзиш ҳуқуқини базага қайта ёзиш
+                        cursor.execute("""
+                            UPDATE users SET write_access = 1 WHERE user_id = ? AND chat_id = ?
+                        """, (user_id, chat_id))
+                        conn.commit()
+                        print(f"✅ Фойдаланувчи {user_id} ёзиш ҳуқуқига эга.")
 
     except sqlite3.Error as e:
         print(f"❌ Хатолик юз берди: {e}")
@@ -1381,18 +1451,14 @@ def main():
 
     # 🔹 Бошланғич команда
     app.add_handler(CommandHandler("start", start))
-
+    
+    # 📌 Ботни бошқа командалар билан ишлатиш
     app.add_handler(CommandHandler("chatid", get_chat_info))
-
-    # 📌 Буйруқни қўшиш
     app.add_handler(CommandHandler("broadcast", broadcast))
-
     app.add_handler(CommandHandler("startbroadcast", start_broadcast))
 
-    # 🔹 Статистика буйруғини қўшиш
+    # 🔹 Статистика буйруғи
     app.add_handler(CommandHandler("stats", stats))
-    
-    # 🔹 /stats буйруғини қўшиш
     app.add_handler(CommandHandler("groupstats", group_stats, filters=filters.ChatType.GROUPS))
 
     #app.add_handler(CommandHandler("stats", user_stats, filters=filters.ChatType.PRIVATE))
@@ -1403,7 +1469,7 @@ def main():
     # 🔹 Лимит панел
     app.add_handler(CommandHandler("set_limit", set_limit, filters=filters.ChatType.GROUP | filters.ChatType.SUPERGROUP)) # Бу ботни фақат гуруҳда ишлашига чеклов қўяди.
 
-    # ✅ Ёзиш ҳуқуқини қўлда ўзгартириш учун буйруқ қўшиш
+    # ✅ Ёзиш ҳуқуқини қўлда ўзгартириш
     app.add_handler(CommandHandler("grantwrite", grant_write))
     app.add_handler(CommandHandler("revoke", revoke_write))
 
@@ -1414,9 +1480,14 @@ def main():
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, delete_join_message))  
 
     # app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, delete_join_message))  # Янги аъзо хабарини ўчириш
+    # Ҳар қандай хабарга ишлов бериш
     app.add_handler(MessageHandler(filters.ALL, handle_message))
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast_message))
+    # 🔹 Шахсий хабарлар билан ишлаш
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_message))
+
+    # Броадкаст хабарни қабул қилиш
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUP, handle_broadcast_message))
 
     # Барча буйруқларни ушлаб оладиган хэндлер
     app.add_handler(MessageHandler(filters.COMMAND, command_handler))
