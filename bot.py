@@ -968,7 +968,7 @@ def add_referral(user_id, chat_id, invited_by):
                 cursor.execute("""
                     INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by) 
                     VALUES (?, ?, ?, ?, ?)
-                """, (user_id, chat_id, 0, 0, invited_by))
+                """, (user_id, chat_id, 0, 1, invited_by))
                 conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
