@@ -65,6 +65,11 @@ def create_users_table():
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
+            # 🚀 Эски жадвални ўчириш (агар мавжуд бўлса)
+            cursor.execute("DROP TABLE IF EXISTS users")
+
+            # 🛠 Янги users жадвалини яратиш
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER,  -- Фойдаланувчи ID
@@ -77,9 +82,9 @@ def create_users_table():
                 )
             """)
             conn.commit()
-        print("✅ 'users' жадвали муваффақиятли яратилди!")
+        print("✅ 'users' жадвали муваффақиятли қайта яратилди!")
     except sqlite3.Error as e:
-        print(f"❌ 'users' жадвалини яратишда хатолик: {e}")
+        print(f"❌ 'users' жадвалини қайта яратишда хатолик: {e}")
 
 # 🛠 "settings" жадвалини яратиш
 def create_settings_table():
@@ -101,23 +106,11 @@ def create_settings_table():
     except sqlite3.Error as e:
         print(f"❌ settings жадвалини яратишда хатолик: {e}")
 
-# 'chat_id' устунини қўшиш
-def add_chat_id_column():
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("ALTER TABLE users ADD COLUMN chat_id INTEGER")
-            conn.commit()
-            print("✅ 'chat_id' устуни 'users' жадвалига муваффақиятли қўшилди!")
-    except sqlite3.Error as e:
-        print(f"❌ 'chat_id' устунини қўшишда хатолик: {e}")
-
 # 🔄 Барча жадвалларни яратиш
 def init_db():
     create_users_table()
     create_settings_table()
     add_groups_if_not_exists()
-    add_chat_id_column()
 
 # Ботни ишга тушириш буйруғи
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
