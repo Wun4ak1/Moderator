@@ -961,14 +961,14 @@ def add_referral(user_id, chat_id, invited_by):
                     FROM users 
                     WHERE user_id=? 
                         AND chat_id=?
-                """,  (user_id, chat_id))
+                """, (user_id, chat_id))
             exists = cursor.fetchone()
 
-            if not exists: # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
+            if not exists:  # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
                 cursor.execute("""
                     INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by) 
                     VALUES (?, ?, ?, ?, ?)
-                """, (user_id, chat_id, 0, 1, invited_by))
+                """, (user_id, chat_id, 0, 0, invited_by))
                 conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
@@ -977,8 +977,8 @@ def add_referral(user_id, chat_id, invited_by):
                 FROM users 
                 WHERE invited_by=? 
                     AND chat_id=? 
-                    AND write_access=1
-            """, (invited_by, chat_id))  # Параметрлар билан ишлаш
+                    AND write_access=1  # Ўзгартирилган ҳолат: фақат ёзиш ҳуқуқи борлар
+            """, (invited_by, chat_id))
             refer_count = cursor.fetchone()[0]
 
             print(f"🔹 REFER COUNT: {refer_count}")  # Лог: Refer count
@@ -992,13 +992,13 @@ def add_referral(user_id, chat_id, invited_by):
                 SET refer_count=?, write_access=? 
                 WHERE user_id=? 
                     AND chat_id=?
-            """, (refer_count, write_access, invited_by, chat_id))  # Параметрлар билан ишлаш
+            """, (refer_count, write_access, invited_by, chat_id))
             conn.commit()  # Маълумотлар тўғри сақланганини текширинг
 
             print(f"✅ {invited_by} учун таклифлар сони: {refer_count} (лимит: {required_refs})")
 
     except sqlite3.Error as e:
-        print(f"❌ add_referral({user_id}): Xатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
+        print(f"❌ add_referral({user_id}): Хатолик yuz berdi: {e}")  # ✅ Хатоларни логга чиқарамиз
 
 # Гуруҳга янги одам қўшилганда
 async def new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):  
@@ -1087,13 +1087,17 @@ def get_refer_count(user_id, chat_id):
                 FROM users
                 WHERE user_id=? AND chat_id=?
             """, (user_id, chat_id))
-            result = cursor.fetchone()
-            if result:
-                return result[0]  # Takliflar sonini qaytaramiz
-            return 0  # Agar natija bo'lmasa 0 qaytaramiz
+            refer_count = cursor.fetchone()
+            
+            if refer_count is None:
+                print(f"❌ {user_id} учун таклифлар сони мавжуд эмас.")
+                return 0  # Агар маълумот бўлмаса, 0 қайтариш
+            
+            return refer_count[0]
+
     except sqlite3.Error as e:
-        print(f"❌ get_refer_count error: {e}")
-        return 0
+        print(f"❌ get_refer_count({user_id}): Хатолик yuz berdi: {e}")
+        return 0  # Хатолик бўлса ҳам 0 қайтариш
 
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1120,12 +1124,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == CREATOR_ID:
         return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
 
-    # Гуруҳ учун минимал чеклов
-    required_refs = get_refer_limit(chat_id)
-
     # Фойдаланувчининг таклифлар сони
     refer_count = get_refer_count(user_id, chat_id)
-    print(f"🔹 REFER COUNT DEBUG: user_id={user_id}, refer_count={refer_count}, required_refs={required_refs}")
+
+    # Гуруҳ учун минимал чеклов
+    required_refs = get_refer_limit(chat_id)
 
     # ✅ Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
     if refer_count < required_refs:
