@@ -652,9 +652,11 @@ async def my_referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn.close()
 
-    mssg = await update.message.reply_text(f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
-                                          f"📄 Ёзиш ҳуқуқи берилган: <b>{can_write_count} та!</b>", 
-                                          parse_mode="HTML")
+    mssg = await update.message.reply_text(
+        f"👤 {first_name}, Сиз таклиф қилганлар сони: <b>{refer_count} та!</b> 📊\n"
+        f"{'❌ Сизга ёзиш ҳуқуқи берилмаган!\n' if can_write_count == 0 else '✅ Сизга ёзиш ҳуқуқи берилган!\n'}", 
+        parse_mode="HTML"
+    )
 
     await asyncio.sleep(5)
 
