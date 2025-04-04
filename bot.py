@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import importlib
 import sqlite3
-import logging
+# import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, JobQueue, ChatMemberHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -257,7 +257,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 MIN_REFER = 5  # Стандарт минимал реферал лимити
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 🔹 Гуруҳ базага қўшилиши учун
 def add_group_to_db(chat_id: int):
@@ -1187,6 +1187,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 print(f"⚡ Фойдаланувчи {user_id} аллақачон базага қўшилган.")
 
+                
+                # Агар фойдаланувчи админ бўлса, функцияни тугатамиз
+                if chat_member.status in ["administrator", "creator"]:
+                    return
+
+                if user_id == CREATOR_ID:
+                    return  # Ботнинг ижодкорини текширмаслик
+
                 # Фойдаланувчининг таклифлар сонини SQL орқали олиш
                 cursor.execute("""
                     SELECT COUNT(*) 
@@ -1236,13 +1244,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except sqlite3.Error as e:
         print(f"❌ Хатолик юз берди: {e}")
-
-    # Агар фойдаланувчи админ бўлса, функцияни тугатамиз
-    if chat_member.status in ["administrator", "creator"]:
-        return
-
-    if user_id == CREATOR_ID:
-        return  # Ботнинг ижодкорини текширмаслик
     
     else:
         # log_action("хабар ёзди", user_id, chat_id)  # Хабар ёзилганини логлаштириш
