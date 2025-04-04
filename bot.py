@@ -1088,7 +1088,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is not None:
         await anti_flood(update, context)  # ✅ Анти-флуд тизими
 
-    if update.message.from_user.id == context.bot.id:
+    if update.message.from_user.id == context.bot.id: # Ботнинг ўз хабарини текшириш
         return  
 
     user_id = update.message.from_user.id  
@@ -1102,12 +1102,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"❌ def handle_message: {user_id} | Chat ID: {chat_id}")  # DEBUG
 
     if chat_member.status in ["administrator", "creator"]:
-        return  
+        return # Агар админ бўлса, функцияни тугатамиз
 
     if user_id == CREATOR_ID:
-        return
+        return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
 
+    # Фойдаланувчининг таклифлар сони
     refer_count = get_refer_count(user_id)
+
+    # Гуруҳ учун минимал чеклов
     required_refs = get_refer_limit(chat_id)
 
     # ✅ Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
@@ -1122,6 +1125,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=chat_id,
                 text=f"Ҳурматли {mention},\n"
                     f"Гуруҳда хабар ёзиш учун \n"
+                    f"таклифлар сони {refer_count}, лимит {required_refs}!\n"
                     f"яна {remaining} та одам қўшинг.",  
                 parse_mode=ParseMode.HTML  
             )
