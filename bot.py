@@ -1106,9 +1106,9 @@ def get_refer_count(user_id, chat_id):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ Фақатгина оддий хабарлар учун ишлайди
     if update.message is not None:
-        await anti_flood(update, context)  # ✅ Анти-флуд тизими
+        await anti_flood(update, context)  # Анти-флуд тизими
 
-    if update.message.from_user.id == context.bot.id: # Ботнинг ўз хабарини текшириш
+    if update.message.from_user.id == context.bot.id:  # Ботнинг ўз хабарини текшириш
         return  
 
     user_id = update.message.from_user.id  
@@ -1117,11 +1117,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
-    # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса (ҳар қандай ҳолатда гуруҳ базага қўшилади)
+    # ⚡ Гуруҳни базага қўшамиз, агар у йўқ бўлса
     add_group_to_db(chat_id)
-    print(f"❌ def handle_message: {user_id} | Chat ID: {chat_id}")  # DEBUG
 
-    # Гуруҳ фойдаланувчисини базага қўшиш
+    # ✅ Фойдаланувчини базага қўшиш
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1139,16 +1138,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"✅ Фойдаланувчи {user_id} гуруҳга қўшилди ва базага сақланди.")
             else:
                 print(f"⚡ Фойдаланувчи {user_id} аллақачон базага қўшилган.")
-                
-    except sqlite3.Error as e:
-        print(f"❌ handle_message: Хатолик фойдаланувчи қўшишда: {e}")
 
-    # Админ ёки ижодкор бўлса, хабарни ёзишга рухсат берилмасин
+    except sqlite3.Error as e:
+        print(f"❌ Хатолик юз берди: {e}")
+
+    # Агар фойдаланувчи админ бўлса, функцияни тугатамиз
     if chat_member.status in ["administrator", "creator"]:
-        return 
+        return
 
     if user_id == CREATOR_ID:
-        return  # Хусусан, ботни ишлатувчи ижодкорни текширмаслик
+        return  # Ботнинг ижодкорини текширмаслик
 
     # Фойдаланувчининг таклифлар сони
     refer_count = get_refer_count(user_id, chat_id)
@@ -1156,26 +1155,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Гуруҳ учун минимал чеклов
     required_refs = get_refer_limit(chat_id)
 
+    # Фойдаланувчи ёзиш ҳуқуқига эгалигини текширамиз
     if refer_count < required_refs:
         remaining = required_refs - refer_count  
 
         mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'  
 
         try:
-            await update.message.delete()  
+            await update.message.delete()  # Хабарни ўчириш
             warning_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"Ҳурматли {mention},\n"
-                    f"Гуруҳда хабар ёзиш учун \n"
-                    f"таклифлар сони {refer_count}, лимит {required_refs}!\n"
-                    f"яна {remaining} та одам қўшинг.",  
+                     f"Гуруҳда хабар ёзиш учун \n"
+                     f"таклифлар сони {refer_count}, лимит {required_refs}!\n"
+                     f"яна {remaining} та одам қўшинг.",  
                 parse_mode=ParseMode.HTML  
             )
             await asyncio.sleep(5) 
-            await warning_msg.delete()  
+            await warning_msg.delete()  # Хабарни ўчириш
             return
         except Exception as e:
             print(f"❌ Хабарни ўчиришда хатолик: {e}")
+
+    else:
+        # Агар фойдаланувчи таклифлар сони талабга етиб бўлса, ёзишга рухсат берилади
+        print(f"✅ {user_name} ёзиш ҳуқуқига эга.")
+        # Бу ерда хабар ёзишга рухсат бериш ва ёзишни амалга ошириш мумкин
 
 # ✅ Ёзиш ҳуқуқини қўлда ўзгартириш учун буйруқ қўшиш
 async def update_write_access(user_id: int, chat_id: int, access: bool):
