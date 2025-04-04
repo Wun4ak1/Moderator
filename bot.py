@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import importlib
 import sqlite3
-import logging
+# import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, JobQueue, ChatMemberHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -257,7 +257,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 MIN_REFER = 5  # Стандарт минимал реферал лимити
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 🔹 Гуруҳ базага қўшилиши учун
 def add_group_to_db(chat_id: int):
@@ -965,10 +965,11 @@ def add_referral(user_id, chat_id, invited_by):
 
             if not exists:  # 📌 Агар фойдаланувчи базада йўқ бўлса, қўшамиз
                 cursor.execute("""
-                    INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active) 
-                    VALUES (?, ?, ?, ?, ?)
-                """, (user_id, chat_id, 0, 1, invited_by, 1))
-                conn.commit()  # Маълумотлар тўғри сақланганини текширинг
+                INSERT INTO users (user_id, chat_id, refer_count, write_access, invited_by, is_active)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, chat_id, 0, 1, invited_by, 1))  # 0 = refer_count, 1 = write_access, 1 = is_active
+            conn.commit()
+            print(f"🔹 add_referral() ishladi: user_id={user_id}, chat_id={chat_id}, invited_by={invited_by}")
 
             # 📌 Таклиф қилинганлар сонини фақат гуруҳда қолганлар орқали ҳисоблаш
             cursor.execute("""
