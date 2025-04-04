@@ -1087,17 +1087,13 @@ def get_refer_count(user_id, chat_id):
                 FROM users
                 WHERE user_id=? AND chat_id=?
             """, (user_id, chat_id))
-            refer_count = cursor.fetchone()
-            
-            if refer_count is None:
-                print(f"❌ {user_id} учун таклифлар сони мавжуд эмас.")
-                return 0  # Агар маълумот бўлмаса, 0 қайтариш
-            
-            return refer_count[0]
-
+            result = cursor.fetchone()
+            if result:
+                return result[0]  # Takliflar sonini qaytaramiz
+            return 0  # Agar natija bo'lmasa 0 qaytaramiz
     except sqlite3.Error as e:
-        print(f"❌ get_refer_count({user_id}): Хатолик yuz berdi: {e}")
-        return 0  # Хатолик бўлса ҳам 0 қайтариш
+        print(f"❌ get_refer_count error: {e}")
+        return 0
 
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
