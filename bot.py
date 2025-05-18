@@ -3,7 +3,7 @@ import importlib
 import sqlite3
 # import logging
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, JobQueue, ChatMemberHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
 import asyncio
 from telegram.constants import ParseMode
@@ -1192,6 +1192,11 @@ async def handle_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ✅ Ҳар бир хабар келганда анти-флудни текшириш
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.message.from_user.id  
+    chat_id = update.effective_chat.id  
+    user_name = update.message.from_user.first_name  
+
     # ✅ Фақатгина оддий хабарлар учун ишлайди
     if update.message is not None:
         await anti_flood(update, context)  # Анти-флуд тизими
@@ -1202,14 +1207,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id == context.bot.id:  # Ботнинг ўз хабарини текшириш
         return  
 
-    user_id = update.message.from_user.id  
-    chat_id = update.effective_chat.id  
-    user_name = update.message.from_user.first_name  
-
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
-    # Каналда аъзо бўлиш шарт
-    # channel_id = "@your_channel_username"  # Бу ерда каналнинг юзерномесини ёзинг
+#    # Каналда аъзо бўлиш шарт
+#    channel_id = "@KosonsoyNoma" #@ToshkanTaksiBot "@KosonsoyNoma" # Канал (бот) usernamе
+#
+#    # Фойдаланувчининг каналга аъзо бўлишини текшириш
+#    if not await is_user_in_channel(context.bot, user_id, channel_id):
+#        try:
+#            await update.message.delete()
+#        except Exception as e:
+#            print(f"❌ Хабарни ўчиришда хатолик: {e}")
+#
+#        try:
+#
+#            # Агар reply_text ёзишда хатолик юзага келса, мустақил хабар юбориш
+#            await context.bot.send_message(
+#                chat_id=chat_id,
+#                text=f"❗️Гуруҳда ёзиш учун аввал каналимизга аъзо бўлинг:\n{channel_id}",
+#                disable_web_page_preview=True
+#            )
+#
+#        except Exception as e:
+#            print(f"❌ Каналга аъзолик текширувида хатолик: {e}")
+#            #await update.message.reply_text("❌ Каналдан аъзо бўлишда хатолик юз берди.")
+#            try:
+#                await context.bot.send_message(
+#                    chat_id=user_id,
+#                    text="❌ Каналдан аъзо бўлишда хатолик юз берди."
+#                )
+#            except Exception as e:
+#                print(f"❌ Хабарни юборишда хатолик: {e}")
 
     # ✅ Фойдаланувчини базага қўшиш
     try:
@@ -1416,10 +1444,12 @@ async def revoke_write(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-# 🛠 3️⃣ Гуруҳга юборилган Ҳаволаларни автоматик ўчириш
+# 🛠 3️⃣ Гуруҳга юборилган Ҳаволаларни автоматик ўчириш (https, t.me, @username)
 async def delete_invite_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Ҳавола бор-йўқлигини REGEX билан текшириш
-    if re.search(r"(https?:\/\/[^\s]+|t\.me\/[a-zA-Z0-9_]+)", update.message.text, re.IGNORECASE):
+    message_text = update.message.text
+
+    # REGEX: https, t.me, ёки @username (калитлар билан)
+    if re.search(r"(https?:\/\/[^\s]+|t\.me\/[a-zA-Z0-9_]+|(?<!\w)@[a-zA-Z0-9_]{5,32})", message_text, re.IGNORECASE):
         try:
             await update.message.delete()
         except Exception as e:
@@ -1441,6 +1471,19 @@ async def command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await response_message.delete()  # Жавоб хабарини ўчириш
     except Exception as e:
         print(f"❌ Хабарни ўчиришда хатолик: {e}")
+
+#async def is_user_in_channel(bot: Bot, user_id: int, channel_username: str) -> bool:
+async def is_user_in_channel(bot, user_id, channel_id):
+    """Фойдаланувчи канал аъзоси эканлигини текширади"""
+    try:
+        #member = await bot.get_chat_member(chat_id=channel_username, user_id=user_id)
+        member = await bot.get_chat_member(channel_id, user_id)
+        if member.status in ["member", "administrator", "creator"]:
+            return True
+        return False
+    except Exception as e:
+        print(f"❌ Канал текширувида хатолик: {e}")
+        return False
 
 # Ботни ишга тушириш
 def main():
